@@ -290,18 +290,23 @@ export default function GamifiedPage() {
     setStreak(prev => (isCorrect ? prev + 1 : 0))
 
     // Save to database - XP ALLOCATION (ONCE PER DAY PER GAME)
-    try {
-      if (user.id !== 'local') {
-        await addXP(xpEarned, activeGame!)
-
-        // Mark game as completed today (dedupe)
-        setTodayCompletedGames(prev =>
-          prev.includes(activeGame!) ? prev : [...prev, activeGame!]
-        )
-      }
-    } catch (error) {
-      console.error('Failed to save game result:', error)
-    }
+   // Save to database - XP ALLOCATION (ONCE PER DAY PER GAME)
+// Save to database - XP ALLOCATION (ONCE PER DAY PER GAME)
+try {
+  if (user.id !== 'local') {
+    await addXP(xpEarned, activeGame!)
+    
+    // IMPORTANT: Reload user data to see updated XP immediately
+    await loadUser(user.id)
+    
+    // Mark game as completed today (dedupe)
+    setTodayCompletedGames(prev =>
+      prev.includes(activeGame!) ? prev : [...prev, activeGame!]
+    )
+  }
+} catch (error) {
+  console.error('Failed to save game result:', error)
+}
   }
 
   const resetGame = () => {
@@ -355,11 +360,17 @@ export default function GamifiedPage() {
   // ====================================
 
   // Calculate current user progress with safety checks
-  const currentLevel = user ? getCurrentLevel(user.total_xp) : { name: 'Seedling', icon: '🌱' }
-  const currentXP = user?.total_xp || 0
-  const nextLevelXP = getNextLevelXP(currentXP)
-  const progressPercentage = nextLevelXP > 0 ? ((currentXP % nextLevelXP) / nextLevelXP) * 100 : 0
 
+// Calculate current user progress with safety checks
+const currentLevel = user ? getCurrentLevel(user.total_xp) : { name: 'Seedling', icon: '🌱' }
+const currentXP = user?.total_xp || 0
+const nextLevelXP = getNextLevelXP(currentXP)
+
+// Fix progress calculation
+const currentLevelStart = currentXP < 25 ? 0 : currentXP < 75 ? 25 : currentXP < 150 ? 75 : currentXP < 300 ? 150 : 300
+const progressInCurrentLevel = currentXP - currentLevelStart
+const levelXPRange = nextLevelXP - currentLevelStart
+const progressPercentage = levelXPRange > 0 ? (progressInCurrentLevel / levelXPRange) * 100 : 0
   // All levels for progress display
   const allLevels = [
     { name: 'Seedling', icon: '🌱', range: '0-24', active: user?.current_level === 'Seedling' },
