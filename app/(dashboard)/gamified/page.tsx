@@ -194,10 +194,10 @@ export default function GamifiedPage() {
   // SUBSECTION: STATE MANAGEMENT
   // To update state: Find this subsection
   // ====================================
-  
+
   // Zustand store for user data
   const { user, isLoading, loadUser, addXP } = useUserStore()
-  
+
   // Local component state
   const [todayCompletedGames, setTodayCompletedGames] = useState<string[]>([])
   const [activeGame, setActiveGame] = useState<string | null>(null)
@@ -216,13 +216,14 @@ export default function GamifiedPage() {
   // ====================================
   useEffect(() => {
     initializeUser()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const initializeUser = async () => {
     try {
       setLoading(true)
-      let userId = localStorage.getItem('gabe_user_id')
-      
+      let userId = typeof window !== 'undefined' ? localStorage.getItem('gabe_user_id') : null
+
       if (!userId) {
         // Create new user
         const response = await fetch('/api/users', {
@@ -230,23 +231,27 @@ export default function GamifiedPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: 'Player', email: null })
         })
+        if (!response.ok) throw new Error('Failed to create user')
         const newUser = await response.json()
         localStorage.setItem('gabe_user_id', newUser.id)
         await loadUser(newUser.id)
-        setTodayCompletedGames(new Set())
+        setTodayCompletedGames([]) // <-- array, not Set
       } else {
         await loadUser(userId)
-        
+
         // Get today's completed games
         const gamesResponse = await fetch(`/api/users/${userId}/today-games`)
         if (gamesResponse.ok) {
-          const completedGames = await gamesResponse.json()
-          const gameIds = completedGames.map((game: any) => game.game_id)
+          const completedGames: { game_id: string }[] = await gamesResponse.json()
+          const gameIds: string[] = (completedGames ?? []).map((g) => String(g.game_id))
           setTodayCompletedGames(gameIds)
+        } else {
+          setTodayCompletedGames([])
         }
       }
     } catch (error) {
       console.error('Failed to initialize user:', error)
+      setTodayCompletedGames([])
     } finally {
       setLoading(false)
     }
@@ -256,7 +261,7 @@ export default function GamifiedPage() {
   // SUBSECTION: GAME INTERACTION HANDLERS
   // To update game logic: Find this subsection
   // ====================================
-  
+
   const handleGameClick = (gameId: string) => {
     // Check if already played today - DAILY LIMIT ENFORCEMENT
     if (todayCompletedGames.includes(gameId)) {
@@ -273,29 +278,26 @@ export default function GamifiedPage() {
   const handleAnswer = async (optionIndex: number) => {
     setSelectedAnswer(optionIndex)
     setShowResult(true)
-    
+
     const currentGame = SPIRITUAL_GAMES.find(g => g.id === activeGame)
     if (!currentGame || !user) return
 
     const isCorrect = currentGame.options[optionIndex].isCorrect
     const xpEarned = isCorrect ? currentGame.points.correct : currentGame.points.wrong
-    
+
     // Update local score tracking
-    if (isCorrect) {
-      setGameScore(gameScore + xpEarned)
-      setStreak(streak + 1)
-    } else {
-      setGameScore(gameScore + xpEarned)
-      setStreak(0)
-    }
+    setGameScore(prev => prev + xpEarned)
+    setStreak(prev => (isCorrect ? prev + 1 : 0))
 
     // Save to database - XP ALLOCATION (ONCE PER DAY PER GAME)
     try {
       if (user.id !== 'local') {
         await addXP(xpEarned, activeGame!)
-        
-        // Mark game as completed today
-        setTodayCompletedGames(prev => [...prev, activeGame!])
+
+        // Mark game as completed today (dedupe)
+        setTodayCompletedGames(prev =>
+          prev.includes(activeGame!) ? prev : [...prev, activeGame!]
+        )
       }
     } catch (error) {
       console.error('Failed to save game result:', error)
@@ -311,15 +313,17 @@ export default function GamifiedPage() {
     setActiveGame(null)
     setSelectedAnswer(null)
     setShowResult(false)
-    
+
     // Check if all 6 games completed today - SUCCESS MESSAGE TRIGGER
     if (todayCompletedGames.length >= 6) {
-      const totalXpToday = Array.from(todayCompletedGames).reduce((sum, gameId) => {
+      const totalXpToday = todayCompletedGames.reduce((sum, gameId) => {
         const game = SPIRITUAL_GAMES.find(g => g.id === gameId)
         return sum + (game?.points.correct || 0)
       }, 0)
-      
-      setSuccessMessage(`🎉 AMAZING! You've completed ALL 6 spiritual games today! You earned ${totalXpToday} XP points! Your faith journey is growing stronger every day. See you tomorrow for more adventures! 🌟`)
+
+      setSuccessMessage(
+        `🎉 AMAZING! You've completed ALL 6 spiritual games today! You earned ${totalXpToday} XP points! Your faith journey is growing stronger every day. See you tomorrow for more adventures! 🌟`
+      )
       setShowSuccessModal(true)
     }
   }
@@ -328,7 +332,7 @@ export default function GamifiedPage() {
   // SUBSECTION: LEVEL CALCULATION HELPERS
   // To update level system: Find this subsection and modify these functions
   // ====================================
-  
+
   const getNextLevelXP = (currentXP: number): number => {
     if (currentXP < 25) return 25
     if (currentXP < 75) return 75
@@ -349,13 +353,13 @@ export default function GamifiedPage() {
   // SUBSECTION: PROGRESS CALCULATIONS
   // To update progress display: Find this subsection
   // ====================================
-  
+
   // Calculate current user progress with safety checks
   const currentLevel = user ? getCurrentLevel(user.total_xp) : { name: 'Seedling', icon: '🌱' }
   const currentXP = user?.total_xp || 0
   const nextLevelXP = getNextLevelXP(currentXP)
-  const progressPercentage = ((currentXP % nextLevelXP) / nextLevelXP) * 100
-  
+  const progressPercentage = nextLevelXP > 0 ? ((currentXP % nextLevelXP) / nextLevelXP) * 100 : 0
+
   // All levels for progress display
   const allLevels = [
     { name: 'Seedling', icon: '🌱', range: '0-24', active: user?.current_level === 'Seedling' },
@@ -398,19 +402,19 @@ export default function GamifiedPage() {
             >
               <ArrowLeft size={20} />
             </button>
-            
+
             {!activeGame && (
               <div className="w-10 h-10 bg-gradient-to-r from-orange-400 to-red-500 rounded-full flex items-center justify-center">
                 <Star className="text-white" size={20} />
               </div>
             )}
           </div>
-          
+
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-white">GABEIFIED</h1>
             <p className="text-orange-300 text-sm italic">"Everyday is a Sunday"</p>
           </div>
-          
+
           {/* Real-time score display from Zustand store */}
           <div className="flex items-center gap-6 text-purple-300">
             <div className="flex items-center gap-2">
@@ -425,8 +429,8 @@ export default function GamifiedPage() {
         </div>
 
         {activeGame && (
-          <button 
-            onClick={backToGames} 
+          <button
+            onClick={backToGames}
             className="flex items-center gap-2 text-purple-300 hover:text-white mt-4"
           >
             <ArrowLeft size={16} />
@@ -455,12 +459,14 @@ export default function GamifiedPage() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-gray-900 font-medium text-sm">Progress to {
-                    currentXP < 25 ? 'Disciple' : 
-                    currentXP < 75 ? 'Messenger' : 
-                    currentXP < 150 ? 'Guardian' : 
-                    currentXP < 300 ? 'Kingdom Builder' : 'Master'
-                  }</p>
+                  <p className="text-gray-900 font-medium text-sm">
+                    Progress to {
+                      currentXP < 25 ? 'Disciple' :
+                      currentXP < 75 ? 'Messenger' :
+                      currentXP < 150 ? 'Guardian' :
+                      currentXP < 300 ? 'Kingdom Builder' : 'Master'
+                    }
+                  </p>
                   <p className="text-gray-500 text-xs">{Math.round(progressPercentage)}%</p>
                 </div>
               </div>
@@ -468,10 +474,10 @@ export default function GamifiedPage() {
               {/* Clean Progress Bar */}
               <div className="mb-4">
                 <div className="w-full bg-gray-200 rounded-full h-1.5">
-                  <div 
+                  <div
                     className="bg-blue-500 h-1.5 rounded-full transition-all duration-500"
                     style={{ width: `${Math.min(progressPercentage, 100)}%` }}
-                  ></div>
+                  />
                 </div>
               </div>
 
@@ -479,13 +485,15 @@ export default function GamifiedPage() {
               <div className="flex justify-between">
                 {allLevels.map((level, index) => (
                   <div key={index} className="flex flex-col items-center">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${
-                      level.active 
-                        ? 'bg-blue-500 shadow-sm' 
-                        : currentXP >= parseInt(level.range.split('-')[0]) || level.range.includes('+')
-                        ? 'bg-gray-300'
-                        : 'bg-gray-200'
-                    }`}>
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${
+                        level.active
+                          ? 'bg-blue-500 shadow-sm'
+                          : currentXP >= parseInt(level.range.split('-')[0]) || level.range.includes('+')
+                          ? 'bg-gray-300'
+                          : 'bg-gray-200'
+                      }`}
+                    >
                       <span className={`text-xs ${level.active ? '' : 'opacity-40'}`}>
                         {level.icon}
                       </span>
@@ -511,8 +519,8 @@ export default function GamifiedPage() {
                 <h3 className="text-lg font-bold text-gray-800">Today's Progress</h3>
               </div>
               <p className="text-gray-600">
-                You've completed {todayCompletedGames.size} out of 6 games today. 
-                {todayCompletedGames.size === 6 ? " Amazing work! 🎉" : " Keep going! 💪"}
+                You've completed {todayCompletedGames.length} out of 6 games today.
+                {todayCompletedGames.length === 6 ? " Amazing work! 🎉" : " Keep going! 💪"}
               </p>
             </div>
 
@@ -524,14 +532,14 @@ export default function GamifiedPage() {
               {SPIRITUAL_GAMES.map((game) => {
                 const IconComponent = game.icon
                 const isCompleted = todayCompletedGames.includes(game.id)
-                
+
                 return (
                   <div
                     key={game.id}
                     onClick={() => handleGameClick(game.id)}
                     className={`bg-white rounded-2xl p-6 border-2 cursor-pointer transition-all duration-300 transform relative ${
-                      isCompleted 
-                        ? 'border-green-300 bg-green-50' 
+                      isCompleted
+                        ? 'border-green-300 bg-green-50'
                         : `${game.borderColor} hover:scale-105 hover:shadow-xl`
                     }`}
                   >
@@ -540,7 +548,7 @@ export default function GamifiedPage() {
                         <CheckCircle className="text-green-500" size={24} />
                       </div>
                     )}
-                    
+
                     <div className="text-center">
                       <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                         <IconComponent className={isCompleted ? 'text-green-500' : game.iconColor} size={32} />
@@ -674,23 +682,29 @@ export default function GamifiedPage() {
               {/* Result */}
               {showResult && selectedAnswer !== null && (
                 <div className="space-y-4">
-                  <div className={`rounded-xl p-4 border-2 ${
-                    currentGame.options[selectedAnswer].isCorrect
-                      ? 'border-green-500 bg-green-50'
-                      : 'border-red-500 bg-red-50'
-                  }`}>
-                    <h5 className={`font-bold text-sm mb-2 ${
+                  <div
+                    className={`rounded-xl p-4 border-2 ${
                       currentGame.options[selectedAnswer].isCorrect
-                        ? 'text-green-700'
-                        : 'text-red-700'
-                    }`}>
+                        ? 'border-green-500 bg-green-50'
+                        : 'border-red-500 bg-red-50'
+                    }`}
+                  >
+                    <h5
+                      className={`font-bold text-sm mb-2 ${
+                        currentGame.options[selectedAnswer].isCorrect
+                          ? 'text-green-700'
+                          : 'text-red-700'
+                      }`}
+                    >
                       {currentGame.options[selectedAnswer].isCorrect ? '🎉 Correct!' : '❌ Not Quite!'}
                     </h5>
-                    <p className={`text-sm leading-relaxed ${
-                      currentGame.options[selectedAnswer].isCorrect
-                        ? 'text-green-600'
-                        : 'text-red-600'
-                    }`}>
+                    <p
+                      className={`text-sm leading-relaxed ${
+                        currentGame.options[selectedAnswer].isCorrect
+                          ? 'text-green-600'
+                          : 'text-red-600'
+                      }`}
+                    >
                       {currentGame.options[selectedAnswer].explanation}
                     </p>
                   </div>
@@ -706,24 +720,32 @@ export default function GamifiedPage() {
 
                   {/* Points Earned */}
                   <div className="text-center">
-                    <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm border-2 ${
-                      currentGame.options[selectedAnswer].isCorrect
-                        ? 'bg-green-50 border-green-200'
-                        : 'bg-orange-50 border-orange-200'
-                    }`}>
-                      <Trophy className={`${
+                    <div
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm border-2 ${
                         currentGame.options[selectedAnswer].isCorrect
-                          ? 'text-green-500'
-                          : 'text-orange-500'
-                      }`} size={16} />
-                      <span className={`font-bold ${
-                        currentGame.options[selectedAnswer].isCorrect
-                          ? 'text-green-700'
-                          : 'text-orange-700'
-                      }`}>
-                        +{currentGame.options[selectedAnswer].isCorrect 
-                          ? currentGame.points.correct 
-                          : currentGame.points.wrong} XP Earned!
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-orange-50 border-orange-200'
+                      }`}
+                    >
+                      <Trophy
+                        className={`${
+                          currentGame.options[selectedAnswer].isCorrect
+                            ? 'text-green-500'
+                            : 'text-orange-500'
+                        }`}
+                        size={16}
+                      />
+                      <span
+                        className={`font-bold ${
+                          currentGame.options[selectedAnswer].isCorrect
+                            ? 'text-green-700'
+                            : 'text-orange-700'
+                        }`}
+                      >
+                        +{currentGame.options[selectedAnswer].isCorrect
+                          ? currentGame.points.correct
+                          : currentGame.points.wrong}{' '}
+                        XP Earned!
                       </span>
                     </div>
                   </div>
