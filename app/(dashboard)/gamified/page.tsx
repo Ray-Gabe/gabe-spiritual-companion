@@ -140,22 +140,22 @@ const SPIRITUAL_GAMES = [
 ]
 
 export default function GamifiedPage() {
-  // Simple local state instead of Supabase
+  // Simple local state instead of Supabase - WITH PROPER TYPES
   const [user] = useState({ total_xp: 15, name: 'Player' }) // Mock user data
-  const [activeGame, setActiveGame] = useState(null)
-  const [selectedAnswer, setSelectedAnswer] = useState(null)
+  const [activeGame, setActiveGame] = useState<string | null>(null)
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [showResult, setShowResult] = useState(false)
   const [gameScore, setGameScore] = useState(0)
   const [streak, setStreak] = useState(0)
   const router = useRouter()
 
-  const handleGameClick = (gameId) => {
+  const handleGameClick = (gameId: string) => {
     setActiveGame(gameId)
     setSelectedAnswer(null)
     setShowResult(false)
   }
 
-  const handleAnswer = (optionIndex) => {
+  const handleAnswer = (optionIndex: number) => {
     setSelectedAnswer(optionIndex)
     setShowResult(true)
     const currentGame = SPIRITUAL_GAMES.find(g => g.id === activeGame)
@@ -182,7 +182,7 @@ export default function GamifiedPage() {
     setShowResult(false)
   }
 
-  const getNextLevelXP = (currentXP) => {
+  const getNextLevelXP = (currentXP: number) => {
     if (currentXP < 25) return 25
     if (currentXP < 75) return 75
     if (currentXP < 150) return 150
@@ -190,7 +190,7 @@ export default function GamifiedPage() {
     return 500
   }
 
-  const getCurrentLevel = (xp) => {
+  const getCurrentLevel = (xp: number) => {
     if (xp < 25) return { name: 'Seedling', icon: '🌱' }
     if (xp < 75) return { name: 'Disciple', icon: '🌿' }
     if (xp < 150) return { name: 'Messenger', icon: '👤' }
