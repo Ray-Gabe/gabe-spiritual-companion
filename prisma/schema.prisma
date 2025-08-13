@@ -1,0 +1,72 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String?  @unique
+  name      String
+  total_xp  Int      @default(0)
+  current_level String @default("Seedling")
+  streak_days Int    @default(0)
+  last_activity DateTime?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  
+  // Relations
+  daily_games DailyGame[]
+  
+  @@map("users")
+}
+
+model DailyGame {
+  id          String   @id @default(cuid())
+  user_id     String
+  game_id     String
+  played_date DateTime @default(now()) @db.Date
+  xp_earned   Int
+  score       Int      @default(0)
+  completed   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  
+  // Relations
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  // Ensure one game per user per day
+  @@unique([user_id, game_id, played_date])
+  @@map("daily_games")
+}
+
+model DailyQuestion {
+  id            String   @id @default(cuid())
+  game_id       String
+  question_date DateTime @default(now()) @db.Date
+  question_data Json     // Store the entire question object
+  ai_source     String   @default("gemini") // "gemini" or "openai"
+  created_at    DateTime @default(now())
+  
+  // Ensure one set of questions per game per day
+  @@unique([game_id, question_date])
+  @@map("daily_questions")
+}
+
+model GameSession {
+  id           String   @id @default(cuid())
+  user_id      String
+  game_id      String
+  started_at   DateTime @default(now())
+  completed_at DateTime?
+  duration     Int?     // Duration in seconds
+  final_score  Int      @default(0)
+  answers      Json?    // Store user's answers
+  
+  @@map("game_sessions")
+}

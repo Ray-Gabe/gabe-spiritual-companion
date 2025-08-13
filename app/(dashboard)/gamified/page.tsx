@@ -1,8 +1,23 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Trophy, Star, Target, Heart, Brain, Shield, Sparkles, CheckCircle, XCircle, Lightbulb, BookOpen } from 'lucide-react'
+
+// Types
+interface User {
+  id: string;
+  name: string;
+  total_xp: number;
+  current_level: string;
+  streak_days: number;
+}
+
+interface PlayedGame {
+  game_id: string;
+  xp_earned: number;
+  score: number;
+}
 
 // Modern 6 Games with Real Gameplay
 const SPIRITUAL_GAMES = [
@@ -139,35 +154,142 @@ const SPIRITUAL_GAMES = [
   }
 ]
 
+// Success Modal Component
+const SuccessModal = ({ isOpen, onClose, message }: { isOpen: boolean; onClose: () => void; message: string }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center">
+        <div className="text-6xl mb-4">🎉</div>
+        <h3 className="text-2xl font-bold text-gray-800 mb-4">Great Job!</h3>
+        <p className="text-gray-600 mb-6">{message}</p>
+        <div className="text-4xl mb-4">😇</div>
+        <p className="text-purple-600 font-semibold mb-6">See ya tomorrow for more spiritual adventures!</p>
+        <button
+          onClick={onClose}
+          className="px-6 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
+        >
+          Awesome!
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export default function GamifiedPage() {
-  // Simple local state instead of Supabase - WITH PROPER TYPES
-  const [user] = useState({ total_xp: 15, name: 'Player' }) // Mock user data
+  // State management with proper types
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [playedToday, setPlayedToday] = useState<PlayedGame[]>([])
   const [activeGame, setActiveGame] = useState<string | null>(null)
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [showResult, setShowResult] = useState(false)
   const [gameScore, setGameScore] = useState(0)
   const [streak, setStreak] = useState(0)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
   const router = useRouter()
 
+  // Initialize user and load today's games
+  useEffect(() => {
+    initializeUser()
+  }, [])
+
+  const initializeUser = async () => {
+    try {
+      setLoading(true)
+      
+      // For now, create a test user or get from localStorage
+      let userId = localStorage.getItem('gabe_user_id')
+      
+      if (!userId) {
+        // Create new user
+        const response = await fetch('/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Player', email: null })
+        })
+        const newUser = await response.json()
+        localStorage.setItem('gabe_user_id', newUser.id)
+        setUser(newUser)
+        setPlayedToday([])
+      } else {
+        // Get existing user and today's games
+        const userResponse = await fetch(`/api/users/${userId}`)
+        const userData = await userResponse.json()
+        setUser(userData)
+        
+        const gamesResponse = await fetch(`/api/users/${userId}/today-games`)
+        const gamesData = await gamesResponse.json()
+        setPlayedToday(gamesData)
+      }
+    } catch (error) {
+      console.error('Failed to initialize user:', error)
+      // Fallback to local state
+      setUser({ id: 'local', name: 'Player', total_xp: 15, current_level: 'Seedling', streak_days: 0 })
+      setPlayedToday([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleGameClick = (gameId: string) => {
+    // Check if already played today
+    const alreadyPlayed = playedToday.some(game => game.game_id === gameId)
+    if (alreadyPlayed) {
+      setSuccessMessage("You've already completed this game today! Come back tomorrow for a new challenge.")
+      setShowSuccessModal(true)
+      return
+    }
+
     setActiveGame(gameId)
     setSelectedAnswer(null)
     setShowResult(false)
   }
 
-  const handleAnswer = (optionIndex: number) => {
+  const handleAnswer = async (optionIndex: number) => {
     setSelectedAnswer(optionIndex)
     setShowResult(true)
+    
     const currentGame = SPIRITUAL_GAMES.find(g => g.id === activeGame)
-    if (!currentGame) return
+    if (!currentGame || !user) return
 
     const isCorrect = currentGame.options[optionIndex].isCorrect
+    const xpEarned = isCorrect ? currentGame.points.correct : currentGame.points.wrong
+    
     if (isCorrect) {
-      setGameScore(gameScore + currentGame.points.correct)
+      setGameScore(gameScore + xpEarned)
       setStreak(streak + 1)
     } else {
-      setGameScore(gameScore + currentGame.points.wrong)
+      setGameScore(gameScore + xpEarned)
       setStreak(0)
+    }
+
+    // Save to database
+    try {
+      if (user.id !== 'local') {
+        await fetch('/api/games/record', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.id,
+            gameId: activeGame,
+            xpEarned,
+            score: isCorrect ? 100 : 0
+          })
+        })
+
+        // Update user data
+        const updatedUser = await fetch(`/api/users/${user.id}`)
+        const userData = await updatedUser.json()
+        setUser(userData)
+
+        // Update played games
+        setPlayedToday(prev => [...prev, { game_id: activeGame, xp_earned: xpEarned, score: isCorrect ? 100 : 0 }])
+      }
+    } catch (error) {
+      console.error('Failed to save game result:', error)
     }
   }
 
@@ -180,6 +302,12 @@ export default function GamifiedPage() {
     setActiveGame(null)
     setSelectedAnswer(null)
     setShowResult(false)
+    
+    // Check if all games completed today
+    if (playedToday.length >= 5) { // 5 out of 6 games (allowing for one completion)
+      setSuccessMessage(`Amazing work! You've completed your spiritual journey for today. You earned ${playedToday.reduce((sum, game) => sum + game.xp_earned, 0)} XP points!`)
+      setShowSuccessModal(true)
+    }
   }
 
   const getNextLevelXP = (currentXP: number) => {
@@ -196,6 +324,34 @@ export default function GamifiedPage() {
     if (xp < 150) return { name: 'Messenger', icon: '👤' }
     if (xp < 300) return { name: 'Guardian', icon: '🛡️' }
     return { name: 'Kingdom Builder', icon: '👑' }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-4">😇</div>
+          <div className="text-xl text-gray-600">Loading your spiritual journey...</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-4">😇</div>
+          <div className="text-xl text-gray-600">Unable to load user data</div>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-xl"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    )
   }
 
   const nextLevelXP = getNextLevelXP(user.total_xp)
@@ -319,23 +475,49 @@ export default function GamifiedPage() {
               </div>
             </div>
 
+            {/* Daily Progress Info */}
+            <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-4 mb-6 border-2 border-green-200">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-2xl">📅</span>
+                <h3 className="text-lg font-bold text-gray-800">Today's Progress</h3>
+              </div>
+              <p className="text-gray-600">
+                You've completed {playedToday.length} out of 6 games today. 
+                {playedToday.length === 6 ? " Amazing work! 🎉" : " Keep going! 💪"}
+              </p>
+            </div>
+
             {/* Enhanced Games Grid */}
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {SPIRITUAL_GAMES.map((game) => {
                 const IconComponent = game.icon
+                const isCompleted = playedToday.some(played => played.game_id === game.id)
                 
                 return (
                   <div
                     key={game.id}
                     onClick={() => handleGameClick(game.id)}
-                    className={`bg-white rounded-2xl p-6 border-2 ${game.borderColor} cursor-pointer hover:scale-105 hover:shadow-xl transition-all duration-300 transform`}
+                    className={`bg-white rounded-2xl p-6 border-2 cursor-pointer transition-all duration-300 transform relative ${
+                      isCompleted 
+                        ? 'border-green-300 bg-green-50' 
+                        : `${game.borderColor} hover:scale-105 hover:shadow-xl`
+                    }`}
                   >
+                    {isCompleted && (
+                      <div className="absolute top-2 right-2">
+                        <CheckCircle className="text-green-500" size={24} />
+                      </div>
+                    )}
+                    
                     <div className="text-center">
                       <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                        <IconComponent className={game.iconColor} size={32} />
+                        <IconComponent className={isCompleted ? 'text-green-500' : game.iconColor} size={32} />
                       </div>
                       <h3 className="text-xl font-bold text-gray-800 mb-2">{game.title}</h3>
                       <p className="text-gray-600 text-sm leading-relaxed">{game.description}</p>
+                      {isCompleted && (
+                        <p className="text-green-600 text-sm font-medium mt-2">✅ Completed today!</p>
+                      )}
                     </div>
                   </div>
                 )
@@ -357,7 +539,7 @@ export default function GamifiedPage() {
             </div>
           </>
         ) : currentGame && (
-          /* Individual Game Interface */
+          /* Individual Game Interface - Same as before but with database integration */
           <div className="bg-white rounded-3xl border-2 border-gray-200 overflow-hidden shadow-lg mx-6">
             {/* Game Header */}
             <div className={`bg-gradient-to-r ${currentGame.color} p-6`}>
@@ -372,7 +554,7 @@ export default function GamifiedPage() {
               </div>
             </div>
 
-            {/* Game Content */}
+            {/* Game Content - Same as before */}
             <div className="p-6 bg-gray-50">
               {/* Scenario/Challenge/Situation/Attack */}
               {currentGame.scenario && (
@@ -529,6 +711,13 @@ export default function GamifiedPage() {
           </div>
         )}
       </div>
+
+      {/* Success Modal */}
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        message={successMessage}
+      />
     </div>
   )
 }
