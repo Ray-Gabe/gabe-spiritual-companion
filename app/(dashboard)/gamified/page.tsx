@@ -1,9 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { useUserStore } from '@/lib/stores/userStore'
-import { useGameStore } from '@/lib/stores/gameStore'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Trophy, Star, Target, Heart, Brain, Shield, Sparkles, CheckCircle, XCircle, Lightbulb, BookOpen } from 'lucide-react'
 
@@ -143,62 +140,22 @@ const SPIRITUAL_GAMES = [
 ]
 
 export default function GamifiedPage() {
-  const { user, setUser } = useUserStore()
-  const { dailyContent, setDailyContent } = useGameStore()
-  const [isLoadingContent, setIsLoadingContent] = useState(true)
-  const [activeGame, setActiveGame] = useState<string | null>(null)
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
+  // Simple local state instead of Supabase
+  const [user] = useState({ total_xp: 15, name: 'Player' }) // Mock user data
+  const [activeGame, setActiveGame] = useState(null)
+  const [selectedAnswer, setSelectedAnswer] = useState(null)
   const [showResult, setShowResult] = useState(false)
   const [gameScore, setGameScore] = useState(0)
   const [streak, setStreak] = useState(0)
   const router = useRouter()
-  const supabase = createClient()
 
-  useEffect(() => {
-    const initializeUser = async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      if (!authUser) {
-        router.push('/')
-        return
-      }
-
-      const { data: profile } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', authUser.id)
-        .single()
-
-      if (profile) {
-        setUser(profile)
-      }
-    }
-
-    initializeUser()
-  }, [])
-
-  useEffect(() => {
-    const loadDailyContent = async () => {
-      try {
-        const response = await fetch('/api/daily-content')
-        const content = await response.json()
-        setDailyContent(content)
-      } catch (error) {
-        console.error('Failed to load daily content:', error)
-      } finally {
-        setIsLoadingContent(false)
-      }
-    }
-
-    loadDailyContent()
-  }, [])
-
-  const handleGameClick = (gameId: string) => {
+  const handleGameClick = (gameId) => {
     setActiveGame(gameId)
     setSelectedAnswer(null)
     setShowResult(false)
   }
 
-  const handleAnswer = (optionIndex: number) => {
+  const handleAnswer = (optionIndex) => {
     setSelectedAnswer(optionIndex)
     setShowResult(true)
     const currentGame = SPIRITUAL_GAMES.find(g => g.id === activeGame)
@@ -225,15 +182,7 @@ export default function GamifiedPage() {
     setShowResult(false)
   }
 
-  const getProgressColor = (xp: number) => {
-    if (xp < 25) return 'from-green-400 to-green-600'
-    if (xp < 75) return 'from-blue-400 to-blue-600'
-    if (xp < 150) return 'from-purple-400 to-purple-600'
-    if (xp < 300) return 'from-orange-400 to-orange-600'
-    return 'from-yellow-400 to-yellow-600'
-  }
-
-  const getNextLevelXP = (currentXP: number) => {
+  const getNextLevelXP = (currentXP) => {
     if (currentXP < 25) return 25
     if (currentXP < 75) return 75
     if (currentXP < 150) return 150
@@ -241,20 +190,12 @@ export default function GamifiedPage() {
     return 500
   }
 
-  const getCurrentLevel = (xp: number) => {
+  const getCurrentLevel = (xp) => {
     if (xp < 25) return { name: 'Seedling', icon: '🌱' }
     if (xp < 75) return { name: 'Disciple', icon: '🌿' }
     if (xp < 150) return { name: 'Messenger', icon: '👤' }
     if (xp < 300) return { name: 'Guardian', icon: '🛡️' }
     return { name: 'Kingdom Builder', icon: '👑' }
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
-        <div className="text-gray-600">Loading your spiritual dashboard...</div>
-      </div>
-    )
   }
 
   const nextLevelXP = getNextLevelXP(user.total_xp)
@@ -277,7 +218,7 @@ export default function GamifiedPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => router.push('/chat')}
+              onClick={() => router.push('/choice')}
               className="text-purple-200 hover:text-white transition-all"
             >
               <ArrowLeft size={20} />
@@ -378,8 +319,6 @@ export default function GamifiedPage() {
               </div>
             </div>
 
-
-
             {/* Enhanced Games Grid */}
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {SPIRITUAL_GAMES.map((game) => {
@@ -418,7 +357,7 @@ export default function GamifiedPage() {
             </div>
           </>
         ) : currentGame && (
-          /* Individual Game Interface - UPDATED TO LIGHT THEME */
+          /* Individual Game Interface */
           <div className="bg-white rounded-3xl border-2 border-gray-200 overflow-hidden shadow-lg mx-6">
             {/* Game Header */}
             <div className={`bg-gradient-to-r ${currentGame.color} p-6`}>
