@@ -1,11 +1,11 @@
 import { prisma } from './client'
 
 // User management functions
-export async function createUser(name: string, email?: string) {
+export async function createUser(name: string, email?: string | null) {
   return await prisma.user.create({
     data: {
       name,
-      email,
+      email: email || undefined,
     },
   })
 }
@@ -16,7 +16,7 @@ export async function getUserById(id: string) {
     include: {
       daily_games: {
         where: {
-          played_date: new Date().toISOString().split('T')[0] as any,
+          played_date: new Date().toISOString().split('T')[0],
         },
       },
     },
@@ -50,13 +50,11 @@ export async function recordDailyGame(
   const today = new Date().toISOString().split('T')[0]
 
   // Check if already played today
-  const existingGame = await prisma.dailyGame.findUnique({
+  const existingGame = await prisma.dailyGame.findFirst({
     where: {
-      user_id_game_id_played_date: {
-        user_id: userId,
-        game_id: gameId,
-        played_date: today as any,
-      },
+      user_id: userId,
+      game_id: gameId,
+      played_date: today,
     },
   })
 
@@ -69,7 +67,7 @@ export async function recordDailyGame(
     data: {
       user_id: userId,
       game_id: gameId,
-      played_date: today as any,
+      played_date: today,
       xp_earned: xpEarned,
       score,
     },
@@ -84,13 +82,11 @@ export async function recordDailyGame(
 export async function hasPlayedToday(userId: string, gameId: string) {
   const today = new Date().toISOString().split('T')[0]
 
-  const game = await prisma.dailyGame.findUnique({
+  const game = await prisma.dailyGame.findFirst({
     where: {
-      user_id_game_id_played_date: {
-        user_id: userId,
-        game_id: gameId,
-        played_date: today as any,
-      },
+      user_id: userId,
+      game_id: gameId,
+      played_date: today,
     },
   })
 
@@ -103,7 +99,7 @@ export async function getTodaysGames(userId: string) {
   return await prisma.dailyGame.findMany({
     where: {
       user_id: userId,
-      played_date: today as any,
+      played_date: today,
     },
   })
 }
