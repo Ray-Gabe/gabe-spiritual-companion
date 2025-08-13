@@ -199,7 +199,7 @@ export default function GamifiedPage() {
   const { user, isLoading, loadUser, addXP } = useUserStore()
   
   // Local component state
-  const [todayCompletedGames, setTodayCompletedGames] = useState<Set<string>>(new Set())
+  const [todayCompletedGames, setTodayCompletedGames] = useState<string[]>([])
   const [activeGame, setActiveGame] = useState<string | null>(null)
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [showResult, setShowResult] = useState(false)
@@ -241,7 +241,7 @@ export default function GamifiedPage() {
         const gamesResponse = await fetch(`/api/users/${userId}/today-games`)
         if (gamesResponse.ok) {
           const completedGames = await gamesResponse.json()
-          const gameIds = new Set(completedGames.map((game: any) => game.game_id))
+          const gameIds = completedGames.map((game: any) => game.game_id)
           setTodayCompletedGames(gameIds)
         }
       }
@@ -259,7 +259,7 @@ export default function GamifiedPage() {
   
   const handleGameClick = (gameId: string) => {
     // Check if already played today - DAILY LIMIT ENFORCEMENT
-    if (todayCompletedGames.has(gameId)) {
+    if (todayCompletedGames.includes(gameId)) {
       setSuccessMessage("You've already completed this game today! 🎮 Come back tomorrow for a new challenge and fresh XP!")
       setShowSuccessModal(true)
       return
@@ -295,7 +295,7 @@ export default function GamifiedPage() {
         await addXP(xpEarned, activeGame!)
         
         // Mark game as completed today
-        setTodayCompletedGames(prev => new Set([...prev, activeGame!]))
+        setTodayCompletedGames(prev => [...prev, activeGame!])
       }
     } catch (error) {
       console.error('Failed to save game result:', error)
@@ -313,7 +313,7 @@ export default function GamifiedPage() {
     setShowResult(false)
     
     // Check if all 6 games completed today - SUCCESS MESSAGE TRIGGER
-    if (todayCompletedGames.size >= 6) {
+    if (todayCompletedGames.length >= 6) {
       const totalXpToday = Array.from(todayCompletedGames).reduce((sum, gameId) => {
         const game = SPIRITUAL_GAMES.find(g => g.id === gameId)
         return sum + (game?.points.correct || 0)
@@ -523,7 +523,7 @@ export default function GamifiedPage() {
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {SPIRITUAL_GAMES.map((game) => {
                 const IconComponent = game.icon
-                const isCompleted = todayCompletedGames.has(game.id)
+                const isCompleted = todayCompletedGames.includes(game.id)
                 
                 return (
                   <div
