@@ -96,7 +96,7 @@ export default function ChoicePage() {
 
         {/* Log In Button */}
         <button
-          onClick={() => router.push('/chat')}
+          onClick={() => router.push('/gamified')}
           disabled={!userInfo.name || !userInfo.age || !userInfo.faithLevel}
           className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-semibold py-4 rounded-2xl mb-4 transition-colors"
         >
@@ -106,7 +106,7 @@ export default function ChoicePage() {
         {/* Bottom Buttons */}
         <div className="grid grid-cols-2 gap-3">
           <button
-            onClick={() => router.push('/chat')}
+            onClick={() => router.push('/gamified')}
             className="flex items-center justify-center gap-2 bg-gray-50 text-gray-700 py-3 rounded-2xl border border-gray-200 hover:bg-gray-100 transition-colors"
           >
             <MessageCircle size={16} />
