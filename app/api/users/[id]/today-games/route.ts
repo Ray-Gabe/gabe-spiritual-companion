@@ -3,19 +3,15 @@ import { getTodaysGames } from '@/lib/database/users'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params
+    const { id } = await context.params
+    const games = await getTodaysGames(id)
     
-    const todaysGames = await getTodaysGames(id)
-    
-    return NextResponse.json(todaysGames)
+    return NextResponse.json(games)
   } catch (error) {
     console.error('Error fetching today\'s games:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch today\'s games' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
