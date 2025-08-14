@@ -1,5 +1,5 @@
 // app/api/games/record/route.ts
-// Fixed games record API with proper PostgreSQL date handling
+// Simplified approach - avoid complex date queries
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/database/client'
@@ -22,35 +22,36 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create proper date range for "today" in UTC
-    const now = new Date()
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000 - 1)
+    // Get today's date as a simple string
+    const today = new Date()
+    const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate())
 
-    console.log('📅 Checking for existing game today:', {
-      todayStart: todayStart.toISOString(),
-      todayEnd: todayEnd.toISOString()
-    })
+    console.log('📅 Today date:', todayDateOnly.toISOString())
 
-    // Check if user has already played this game today using date range
-    const existingGame = await prisma.dailyGame.findFirst({
+    // Check if user has already played this game today using simpler approach
+    const allUserGames = await prisma.dailyGame.findMany({
       where: {
         userId: userId,
-        gameId: gameId,
-        playedDate: {
-          gte: todayStart,
-          lte: todayEnd
-        }
+        gameId: gameId
+      },
+      select: {
+        playedDate: true
       }
     })
 
-    if (existingGame) {
+    // Check in JavaScript instead of SQL
+    const todayString = todayDateOnly.toISOString().split('T')[0]
+    const hasPlayedToday = allUserGames.some(game => {
+      const gameDate = new Date(game.playedDate).toISOString().split('T')[0]
+      return gameDate === todayString
+    })
+
+    if (hasPlayedToday) {
       console.log('⚠️ Game already played today')
       return NextResponse.json(
         { 
           error: 'Game already played today',
-          message: 'You can only play each game once per day',
-          nextPlayTime: new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
+          message: 'You can only play each game once per day'
         },
         { status: 409 }
       )
@@ -60,12 +61,12 @@ export async function POST(request: NextRequest) {
 
     // Use transaction for data consistency
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Record the daily game with current timestamp
+      // 1. Record the daily game with simple date
       const dailyGame = await tx.dailyGame.create({
         data: {
           userId,
           gameId,
-          playedDate: new Date(), // Use current timestamp
+          playedDate: todayDateOnly, // Use simple date
           xpEarned,
           score
         }

@@ -1,5 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// prisma/schema.prisma
+// Temporarily use DATABASE_URL for local development
 
 generator client {
   provider = "prisma-client-js"
@@ -7,65 +7,65 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = "postgresql://postgres:IUMSnYOWEaQDYyXEGLJBRSGyeCGkCmzH@shortline.proxy.rlwy.net:23289/railway"
+  url      = env("DATABASE_URL")
 }
+
 model User {
-  id            String   @id @default(cuid())
-  email         String?  @unique
-  name          String
-  total_xp      Int      @default(0)
-  current_level String   @default("Seedling")
-  streak_days   Int      @default(0)
-  last_activity DateTime?
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  id           String   @id @default(cuid())
+  email        String?  @unique  // Made nullable to match your data
+  name         String
+  totalXP      Int      @default(0) @map("total_xp")
+  currentLevel String   @default("Seedling") @map("current_level")
+  streakDays   Int      @default(0) @map("streak_days")
+  lastActivity DateTime? @map("last_activity")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   // Relations
-  daily_games    DailyGame[]
-  game_sessions  GameSession[]
+  dailyGames   DailyGame[]
+  gameSessions GameSession[]
 
   @@map("users")
 }
 
 model DailyGame {
-  id          String   @id @default(cuid())
-  user_id     String
-  game_id     String
-  played_date String   // Store as string YYYY-MM-DD
-  xp_earned   Int
-  score       Int      @default(0)
-  // completed_at DateTime @default(now())  // REMOVE THIS LINE
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  gameId     String   @map("game_id")
+  playedDate DateTime @map("played_date") @db.Date  // Explicitly use DATE type
+  xpEarned   Int      @map("xp_earned")
+  score      Int?
 
   // Relations
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Simple unique constraint
-  @@unique([user_id, game_id, played_date])
+  // Unique constraint - one game per user per day
+  @@unique([userId, gameId, playedDate])
   @@map("daily_games")
 }
-model DailyQuestion {
-  id            String   @id @default(cuid())
-  game_id       String
-  question_date String   // Store as string YYYY-MM-DD
-  question_data Json     // Store the AI-generated question content
-  created_at    DateTime @default(now())
 
-  @@unique([game_id, question_date])
+model DailyQuestion {
+  id           String   @id @default(cuid())
+  gameId       String   @map("game_id")
+  questionDate DateTime @map("question_date") @db.Date
+  questionData Json     @map("question_data")
+  createdAt    DateTime @default(now()) @map("created_at")
+
   @@map("daily_questions")
 }
 
 model GameSession {
-  id         String   @id @default(cuid())
-  user_id    String
-  game_id    String
-  score      Int
-  xp_earned  Int
-  duration   Int?     // seconds
-  started_at DateTime @default(now())
-  ended_at   DateTime?
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  gameId    String   @map("game_id")
+  score     Int
+  xpEarned  Int      @map("xp_earned")
+  duration  Int?     // in seconds
+  startedAt DateTime @default(now()) @map("started_at")
+  endedAt   DateTime @map("ended_at")
 
   // Relations
-  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("game_sessions")
 }

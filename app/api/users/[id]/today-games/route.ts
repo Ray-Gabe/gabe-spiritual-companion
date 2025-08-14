@@ -1,5 +1,5 @@
 // app/api/users/[id]/today-games/route.ts
-// Fixed API with proper PostgreSQL date handling
+// Simplified approach - avoid date filtering entirely
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/database/client'
@@ -11,42 +11,41 @@ export async function GET(
   try {
     const { id: userId } = await context.params
     
-    console.log('📅 Fetching today games for user:', userId)
+    console.log('📅 Fetching games for user:', userId)
 
-    // Create proper date range for "today" in UTC
-    const now = new Date()
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000 - 1)
-
-    console.log('📅 Date range:', {
-      todayStart: todayStart.toISOString(),
-      todayEnd: todayEnd.toISOString()
-    })
-
-    // Query with proper date range
-    const todayGames = await prisma.dailyGame.findMany({
+    // Get ALL daily games for this user (we'll filter on frontend)
+    const allGames = await prisma.dailyGame.findMany({
       where: {
-        userId: userId,
-        playedDate: {
-          gte: todayStart,
-          lte: todayEnd
-        }
+        userId: userId
       },
       select: {
         gameId: true,
         xpEarned: true,
         score: true,
         playedDate: true
+      },
+      orderBy: {
+        playedDate: 'desc'
       }
     })
 
-    console.log('🎮 Found today games:', todayGames.length)
+    // Filter for today's games in JavaScript instead of SQL
+    const today = new Date()
+    const todayString = today.toISOString().split('T')[0] // YYYY-MM-DD
+
+    const todayGames = allGames.filter(game => {
+      const gameDate = new Date(game.playedDate).toISOString().split('T')[0]
+      return gameDate === todayString
+    })
+
+    console.log('🎮 Total games:', allGames.length, 'Today games:', todayGames.length)
 
     return NextResponse.json({
       success: true,
       games: todayGames,
       gameIds: todayGames.map(game => game.gameId),
-      count: todayGames.length
+      count: todayGames.length,
+      totalGames: allGames.length
     })
 
   } catch (error) {
