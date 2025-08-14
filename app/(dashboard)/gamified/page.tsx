@@ -3,29 +3,21 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Trophy, Star, Target, Heart, Brain, Shield, Sparkles, CheckCircle, XCircle, Lightbulb, BookOpen } from 'lucide-react'
-import { useUserStore } from '@/lib/stores/userStore'
 
-// ====================================
-// SECTION: TYPE DEFINITIONS
-// ====================================
+// Simple interfaces
 interface User {
-  id: string;
-  name: string;
-  total_xp: number;
-  current_level: string;
-  streak_days: number;
+  id: string
+  name: string
+  total_xp: number
+  current_level: string
 }
 
-interface PlayedGame {
-  game_id: string;
-  xp_earned: number;
-  score: number;
+interface CompletedGame {
+  game_id: string
+  xp_earned: number
 }
 
-// ====================================
-// SECTION: GAME DATA CONFIGURATION
-// To update games: Find this section and modify SPIRITUAL_GAMES array
-// ====================================
+// Game data (same as before)
 const SPIRITUAL_GAMES = [
   {
     id: 'scripture-detective',
@@ -33,10 +25,8 @@ const SPIRITUAL_GAMES = [
     description: "Can you spot the real Bible verse from the fake ones?",
     icon: Brain,
     color: 'from-blue-500 to-indigo-600',
-    bgColor: 'from-blue-50 to-indigo-100',
-    borderColor: 'border-blue-200',
     iconColor: 'text-blue-500',
-    type: "multiple-choice",
+    borderColor: 'border-blue-200',
     question: "Which of these is a REAL Bible verse?",
     options: [
       { text: "God helps those who help themselves", isCorrect: false, explanation: "This is actually NOT in the Bible! It's a common saying but Benjamin Franklin said it." },
@@ -54,10 +44,8 @@ const SPIRITUAL_GAMES = [
     description: "Navigate ethical scenarios with biblical wisdom",
     icon: Target,
     color: 'from-green-500 to-emerald-600',
-    bgColor: 'from-green-50 to-emerald-100',
-    borderColor: 'border-green-200',
     iconColor: 'text-green-500',
-    type: "scenario",
+    borderColor: 'border-green-200',
     scenario: "Your best friend asks you to lie to their parents about where they were last night. They promise they weren't doing anything dangerous.",
     question: "What's the most Christ-like response?",
     options: [
@@ -72,15 +60,12 @@ const SPIRITUAL_GAMES = [
   },
   {
     id: 'faith-heroes',
-    title: "Faith Heroes Journey",
+    title: "Faith Heroes Journey", 
     description: "Walk with Bible heroes in their moments of faith",
     icon: Trophy,
     color: 'from-amber-500 to-yellow-600',
-    bgColor: 'from-amber-50 to-yellow-100',
-    borderColor: 'border-amber-200',
     iconColor: 'text-orange-500',
-    type: "matching",
-    challenge: "David faced a giant with just a sling and stones. What gave him courage?",
+    borderColor: 'border-amber-200',
     question: "What gave David courage to face Goliath?",
     options: [
       { text: "His military training", isCorrect: false, explanation: "David was just a young shepherd, not a trained soldier." },
@@ -98,10 +83,8 @@ const SPIRITUAL_GAMES = [
     description: "Practice showing God's love in practical ways",
     icon: Heart,
     color: 'from-pink-500 to-rose-600',
-    bgColor: 'from-pink-50 to-rose-100',
-    borderColor: 'border-pink-200',
     iconColor: 'text-pink-500',
-    type: "application",
+    borderColor: 'border-pink-200',
     situation: "Your little sibling is having a really hard day and feels left out at school.",
     question: "How can you show them God's love in a practical way?",
     options: [
@@ -120,10 +103,8 @@ const SPIRITUAL_GAMES = [
     description: "Battle worldly lies with biblical truth",
     icon: Shield,
     color: 'from-purple-500 to-violet-600',
-    bgColor: 'from-purple-50 to-violet-100',
-    borderColor: 'border-purple-200',
     iconColor: 'text-purple-500',
-    type: "defense",
+    borderColor: 'border-purple-200',
     attack: "Social media influence: 'You only live once! Do whatever makes you happy, even if it hurts others.'",
     question: "What biblical truth defeats this lie?",
     options: [
@@ -142,10 +123,8 @@ const SPIRITUAL_GAMES = [
     description: "Level up your prayer life with biblical styles",
     icon: Sparkles,
     color: 'from-cyan-500 to-blue-600',
-    bgColor: 'from-cyan-50 to-blue-100',
-    borderColor: 'border-cyan-200',
     iconColor: 'text-cyan-500',
-    type: "practice",
+    borderColor: 'border-cyan-200',
     challenge: "You're stressed about a big test tomorrow. How do you pray about it?",
     question: "Which prayer approach combines trust, honesty, and surrender?",
     options: [
@@ -160,12 +139,9 @@ const SPIRITUAL_GAMES = [
   }
 ]
 
-// ====================================
-// SECTION: SUCCESS MODAL COMPONENT
-// To update modal: Find this section and modify SuccessModal component
-// ====================================
+// Simple Success Modal
 const SuccessModal = ({ isOpen, onClose, message }: { isOpen: boolean; onClose: () => void; message: string }) => {
-  if (!isOpen) return null;
+  if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -183,89 +159,64 @@ const SuccessModal = ({ isOpen, onClose, message }: { isOpen: boolean; onClose: 
         </button>
       </div>
     </div>
-  );
-};
+  )
+}
 
-// ====================================
-// SECTION: MAIN COMPONENT
-// ====================================
 export default function GamifiedPage() {
-  // ====================================
-  // SUBSECTION: STATE MANAGEMENT
-  // To update state: Find this subsection
-  // ====================================
-
-  // Zustand store for user data
-  const { user, isLoading, loadUser, addXP } = useUserStore()
-
-  // Local component state
-  const [todayCompletedGames, setTodayCompletedGames] = useState<string[]>([])
+  // Simple state - no complex stores
+  const [user, setUser] = useState<User | null>(null)
+  const [completedGames, setCompletedGames] = useState<CompletedGame[]>([])
   const [activeGame, setActiveGame] = useState<string | null>(null)
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [showResult, setShowResult] = useState(false)
-  const [gameScore, setGameScore] = useState(0)
-  const [streak, setStreak] = useState(0)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
-  // ====================================
-  // SUBSECTION: INITIALIZATION
-  // To update user loading: Find this subsection
-  // ====================================
+  // Load user data on startup
   useEffect(() => {
-    initializeUser()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    loadUserData()
   }, [])
 
-  const initializeUser = async () => {
+  const loadUserData = async () => {
     try {
-      setLoading(true)
-      let userId = typeof window !== 'undefined' ? localStorage.getItem('gabe_user_id') : null
-
+      const userId = localStorage.getItem('gabe_user_id')
       if (!userId) {
-        // Create new user
-        const response = await fetch('/api/users', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: 'Player', email: null })
-        })
-        if (!response.ok) throw new Error('Failed to create user')
-        const newUser = await response.json()
-        localStorage.setItem('gabe_user_id', newUser.id)
-        await loadUser(newUser.id)
-        setTodayCompletedGames([]) // <-- array, not Set
-      } else {
-        await loadUser(userId)
-
-        // Get today's completed games
-        const gamesResponse = await fetch(`/api/users/${userId}/today-games`)
-        if (gamesResponse.ok) {
-          const completedGames: { game_id: string }[] = await gamesResponse.json()
-          const gameIds: string[] = (completedGames ?? []).map((g) => String(g.game_id))
-          setTodayCompletedGames(gameIds)
-        } else {
-          setTodayCompletedGames([])
-        }
+        router.push('/choice')
+        return
       }
+
+      console.log('Loading user data for:', userId)
+
+      // Get user info
+      const userResponse = await fetch(`/api/users/${userId}`)
+      if (userResponse.ok) {
+        const userData = await userResponse.json()
+        setUser(userData)
+        console.log('User data loaded:', userData)
+      }
+
+      // Get today's completed games
+      const gamesResponse = await fetch(`/api/users/${userId}/today-games`)
+      if (gamesResponse.ok) {
+        const gamesData = await gamesResponse.json()
+        setCompletedGames(gamesData)
+        console.log('Completed games loaded:', gamesData)
+      }
+
     } catch (error) {
-      console.error('Failed to initialize user:', error)
-      setTodayCompletedGames([])
+      console.error('Error loading user data:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  // ====================================
-  // SUBSECTION: GAME INTERACTION HANDLERS
-  // To update game logic: Find this subsection
-  // ====================================
-
   const handleGameClick = (gameId: string) => {
-    // Check if already played today - DAILY LIMIT ENFORCEMENT
-    if (todayCompletedGames.includes(gameId)) {
-      setSuccessMessage("You've already completed this game today! 🎮 Come back tomorrow for a new challenge and fresh XP!")
+    // Check if already played today
+    const alreadyPlayed = completedGames.some(game => game.game_id === gameId)
+    if (alreadyPlayed) {
+      setSuccessMessage("You've already completed this game today! 🎮 Come back tomorrow for a new challenge!")
       setShowSuccessModal(true)
       return
     }
@@ -285,33 +236,38 @@ export default function GamifiedPage() {
     const isCorrect = currentGame.options[optionIndex].isCorrect
     const xpEarned = isCorrect ? currentGame.points.correct : currentGame.points.wrong
 
-    // Update local score tracking
-    setGameScore(prev => prev + xpEarned)
-    setStreak(prev => (isCorrect ? prev + 1 : 0))
+    console.log('Recording game result:', { userId: user.id, gameId: activeGame, xpEarned, isCorrect })
 
-    // Save to database - XP ALLOCATION (ONCE PER DAY PER GAME)
-   // Save to database - XP ALLOCATION (ONCE PER DAY PER GAME)
-// Save to database - XP ALLOCATION (ONCE PER DAY PER GAME)
-try {
-  if (user.id !== 'local') {
-    await addXP(xpEarned, activeGame!)
-    
-    // IMPORTANT: Reload user data to see updated XP immediately
-    await loadUser(user.id)
-    
-    // Mark game as completed today (dedupe)
-    setTodayCompletedGames(prev =>
-      prev.includes(activeGame!) ? prev : [...prev, activeGame!]
-    )
-  }
-} catch (error) {
-  console.error('Failed to save game result:', error)
-}
-  }
+    try {
+      // Record game result directly to API
+      const response = await fetch('/api/games/record', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          gameId: activeGame,
+          xpEarned: xpEarned,
+          score: isCorrect ? 100 : 0
+        })
+      })
 
-  const resetGame = () => {
-    setSelectedAnswer(null)
-    setShowResult(false)
+      if (response.ok) {
+        const result = await response.json()
+        console.log('Game recorded successfully:', result)
+        
+        // Update user data immediately
+        setUser(prev => prev ? { ...prev, total_xp: prev.total_xp + xpEarned } : null)
+        
+        // Add to completed games
+        setCompletedGames(prev => [...prev, { game_id: activeGame!, xp_earned: xpEarned }])
+        
+        console.log('User XP updated locally')
+      } else {
+        console.error('Failed to record game:', response.status)
+      }
+    } catch (error) {
+      console.error('Error recording game:', error)
+    }
   }
 
   const backToGames = () => {
@@ -319,34 +275,21 @@ try {
     setSelectedAnswer(null)
     setShowResult(false)
 
-    // Check if all 6 games completed today - SUCCESS MESSAGE TRIGGER
-    if (todayCompletedGames.length >= 6) {
-      const totalXpToday = todayCompletedGames.reduce((sum, gameId) => {
-        const game = SPIRITUAL_GAMES.find(g => g.id === gameId)
-        return sum + (game?.points.correct || 0)
-      }, 0)
-
-      setSuccessMessage(
-        `🎉 AMAZING! You've completed ALL 6 spiritual games today! You earned ${totalXpToday} XP points! Your faith journey is growing stronger every day. See you tomorrow for more adventures! 🌟`
-      )
+    // Check if all games completed
+    if (completedGames.length >= 6) {
+      const totalXP = completedGames.reduce((sum, game) => sum + game.xp_earned, 0)
+      setSuccessMessage(`🎉 AMAZING! You've completed ALL 6 spiritual games today! You earned ${totalXP} XP points! See you tomorrow! 🌟`)
       setShowSuccessModal(true)
     }
   }
 
-  // ====================================
-  // SUBSECTION: LEVEL CALCULATION HELPERS
-  // To update level system: Find this subsection and modify these functions
-  // ====================================
-
-  const getNextLevelXP = (currentXP: number): number => {
-    if (currentXP < 25) return 25
-    if (currentXP < 75) return 75
-    if (currentXP < 150) return 150
-    if (currentXP < 300) return 300
-    return 500
+  const resetGame = () => {
+    setSelectedAnswer(null)
+    setShowResult(false)
   }
 
-  const getCurrentLevel = (xp: number) => {
+  // Helper functions
+  const getLevelInfo = (xp: number) => {
     if (xp < 25) return { name: 'Seedling', icon: '🌱' }
     if (xp < 75) return { name: 'Disciple', icon: '🌿' }
     if (xp < 150) return { name: 'Messenger', icon: '👤' }
@@ -354,37 +297,15 @@ try {
     return { name: 'Kingdom Builder', icon: '👑' }
   }
 
-  // ====================================
-  // SUBSECTION: PROGRESS CALCULATIONS
-  // To update progress display: Find this subsection
-  // ====================================
+  const getNextLevelXP = (xp: number) => {
+    if (xp < 25) return 25
+    if (xp < 75) return 75
+    if (xp < 150) return 150
+    if (xp < 300) return 300
+    return 500
+  }
 
-  // Calculate current user progress with safety checks
-
-// Calculate current user progress with safety checks
-const currentLevel = user ? getCurrentLevel(user.total_xp) : { name: 'Seedling', icon: '🌱' }
-const currentXP = user?.total_xp || 0
-const nextLevelXP = getNextLevelXP(currentXP)
-
-// Fix progress calculation
-const currentLevelStart = currentXP < 25 ? 0 : currentXP < 75 ? 25 : currentXP < 150 ? 75 : currentXP < 300 ? 150 : 300
-const progressInCurrentLevel = currentXP - currentLevelStart
-const levelXPRange = nextLevelXP - currentLevelStart
-const progressPercentage = levelXPRange > 0 ? (progressInCurrentLevel / levelXPRange) * 100 : 0
-  // All levels for progress display
-  const allLevels = [
-    { name: 'Seedling', icon: '🌱', range: '0-24', active: user?.current_level === 'Seedling' },
-    { name: 'Disciple', icon: '🌿', range: '25-74', active: user?.current_level === 'Disciple' },
-    { name: 'Messenger', icon: '👤', range: '75-149', active: user?.current_level === 'Messenger' },
-    { name: 'Guardian', icon: '🛡️', range: '150-299', active: user?.current_level === 'Guardian' },
-    { name: 'Kingdom Builder', icon: '👑', range: '300+', active: user?.current_level === 'Kingdom Builder' }
-  ]
-
-  // Get current game for individual game view
-  const currentGame = activeGame ? SPIRITUAL_GAMES.find(g => g.id === activeGame) : null
-
-  // Show loading state
-  if (loading || isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
         <div className="text-center">
@@ -395,15 +316,18 @@ const progressPercentage = levelXPRange > 0 ? (progressInCurrentLevel / levelXPR
     )
   }
 
-  // ====================================
-  // SUBSECTION: MAIN RENDER
-  // ====================================
+  if (!user) {
+    router.push('/choice')
+    return null
+  }
+
+  const currentLevel = getLevelInfo(user.total_xp)
+  const nextLevelXP = getNextLevelXP(user.total_xp)
+  const currentGame = activeGame ? SPIRITUAL_GAMES.find(g => g.id === activeGame) : null
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 to-blue-200 p-4">
-      {/* ====================================
-          SUBSECTION: HEADER COMPONENT
-          To update header: Find this subsection
-          ==================================== */}
+      {/* Header */}
       <div className="bg-purple-800/60 backdrop-blur-sm border-b border-purple-500/30 p-4 rounded-t-2xl mb-4 mx-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -413,35 +337,33 @@ const progressPercentage = levelXPRange > 0 ? (progressInCurrentLevel / levelXPR
             >
               <ArrowLeft size={20} />
             </button>
-
             {!activeGame && (
               <div className="w-10 h-10 bg-gradient-to-r from-orange-400 to-red-500 rounded-full flex items-center justify-center">
                 <Star className="text-white" size={20} />
               </div>
             )}
           </div>
-
+          
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-white">GABEIFIED</h1>
             <p className="text-orange-300 text-sm italic">"Everyday is a Sunday"</p>
           </div>
-
-          {/* Real-time score display from Zustand store */}
+          
           <div className="flex items-center gap-6 text-purple-300">
             <div className="flex items-center gap-2">
               <Trophy className="text-yellow-500" size={16} />
-              <span className="font-medium">Score: {user?.total_xp || 0}</span>
+              <span className="font-medium">Score: {user.total_xp}</span>
             </div>
             <div className="flex items-center gap-2">
               <Star className="text-orange-500" size={16} />
-              <span className="font-medium">Streak: {user?.streak_days || 0}</span>
+              <span className="font-medium">Games: {completedGames.length}/6</span>
             </div>
           </div>
         </div>
 
         {activeGame && (
-          <button
-            onClick={backToGames}
+          <button 
+            onClick={backToGames} 
             className="flex items-center gap-2 text-purple-300 hover:text-white mt-4"
           >
             <ArrowLeft size={16} />
@@ -453,12 +375,8 @@ const progressPercentage = levelXPRange > 0 ? (progressInCurrentLevel / levelXPR
       <div className="max-w-6xl mx-auto p-6">
         {!activeGame ? (
           <>
-            {/* ====================================
-                SUBSECTION: PROGRESS CARD
-                To update progress display: Find this subsection
-                ==================================== */}
+            {/* Progress Card */}
             <div className="bg-white rounded-2xl p-4 mb-6 shadow-lg border-2 border-blue-200">
-              {/* Header Section */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
@@ -466,91 +384,50 @@ const progressPercentage = levelXPRange > 0 ? (progressInCurrentLevel / levelXPR
                   </div>
                   <div>
                     <h2 className="text-lg font-semibold text-gray-900">{currentLevel.name}</h2>
-                    <p className="text-gray-500 text-xs">{currentXP} XP Points</p>
+                    <p className="text-gray-500 text-xs">{user.total_xp} XP Points</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-gray-900 font-medium text-sm">
-                    Progress to {
-                      currentXP < 25 ? 'Disciple' :
-                      currentXP < 75 ? 'Messenger' :
-                      currentXP < 150 ? 'Guardian' :
-                      currentXP < 300 ? 'Kingdom Builder' : 'Master'
-                    }
-                  </p>
-                  <p className="text-gray-500 text-xs">{Math.round(progressPercentage)}%</p>
+                  <p className="text-gray-900 font-medium text-sm">Progress to next level</p>
+                  <p className="text-gray-500 text-xs">{Math.round((user.total_xp / nextLevelXP) * 100)}%</p>
                 </div>
               </div>
 
-              {/* Clean Progress Bar */}
               <div className="mb-4">
                 <div className="w-full bg-gray-200 rounded-full h-1.5">
-                  <div
+                  <div 
                     className="bg-blue-500 h-1.5 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(progressPercentage, 100)}%` }}
-                  />
+                    style={{ width: `${Math.min((user.total_xp / nextLevelXP) * 100, 100)}%` }}
+                  ></div>
                 </div>
-              </div>
-
-              {/* Enhanced Level Journey */}
-              <div className="flex justify-between">
-                {allLevels.map((level, index) => (
-                  <div key={index} className="flex flex-col items-center">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${
-                        level.active
-                          ? 'bg-blue-500 shadow-sm'
-                          : currentXP >= parseInt(level.range.split('-')[0]) || level.range.includes('+')
-                          ? 'bg-gray-300'
-                          : 'bg-gray-200'
-                      }`}
-                    >
-                      <span className={`text-xs ${level.active ? '' : 'opacity-40'}`}>
-                        {level.icon}
-                      </span>
-                    </div>
-                    <p className={`text-xs font-medium mb-0.5 ${level.active ? 'text-gray-900' : 'text-gray-400'}`}>
-                      {level.name}
-                    </p>
-                    <p className={`text-xs ${level.active ? 'text-gray-500' : 'text-gray-400'}`}>
-                      {level.range} XP
-                    </p>
-                  </div>
-                ))}
               </div>
             </div>
 
-            {/* ====================================
-                SUBSECTION: DAILY PROGRESS INFO
-                To update daily tracking: Find this subsection
-                ==================================== */}
+            {/* Today's Progress */}
             <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-4 mb-6 border-2 border-green-200">
               <div className="flex items-center gap-3 mb-2">
                 <span className="text-2xl">📅</span>
                 <h3 className="text-lg font-bold text-gray-800">Today's Progress</h3>
               </div>
               <p className="text-gray-600">
-                You've completed {todayCompletedGames.length} out of 6 games today.
-                {todayCompletedGames.length === 6 ? " Amazing work! 🎉" : " Keep going! 💪"}
+                You've completed {completedGames.length} out of 6 games today. 
+                {completedGames.length === 6 ? " Amazing work! 🎉" : " Keep going! 💪"}
               </p>
             </div>
 
-            {/* ====================================
-                SUBSECTION: GAMES GRID
-                To update game cards: Find this subsection
-                ==================================== */}
+            {/* Games Grid */}
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {SPIRITUAL_GAMES.map((game) => {
                 const IconComponent = game.icon
-                const isCompleted = todayCompletedGames.includes(game.id)
-
+                const isCompleted = completedGames.some(completedGame => completedGame.game_id === game.id)
+                
                 return (
                   <div
                     key={game.id}
                     onClick={() => handleGameClick(game.id)}
                     className={`bg-white rounded-2xl p-6 border-2 cursor-pointer transition-all duration-300 transform relative ${
-                      isCompleted
-                        ? 'border-green-300 bg-green-50'
+                      isCompleted 
+                        ? 'border-green-300 bg-green-50' 
                         : `${game.borderColor} hover:scale-105 hover:shadow-xl`
                     }`}
                   >
@@ -559,7 +436,7 @@ const progressPercentage = levelXPRange > 0 ? (progressInCurrentLevel / levelXPR
                         <CheckCircle className="text-green-500" size={24} />
                       </div>
                     )}
-
+                    
                     <div className="text-center">
                       <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                         <IconComponent className={isCompleted ? 'text-green-500' : game.iconColor} size={32} />
@@ -575,10 +452,7 @@ const progressPercentage = levelXPRange > 0 ? (progressInCurrentLevel / levelXPR
               })}
             </div>
 
-            {/* ====================================
-                SUBSECTION: FOOTER
-                To update footer: Find this subsection
-                ==================================== */}
+            {/* Footer */}
             <div className="mt-6 mx-6">
               <div className="bg-purple-800/60 backdrop-blur-sm rounded-b-2xl p-4 shadow-lg border border-purple-500/30">
                 <div className="flex items-center justify-center gap-3">
@@ -593,10 +467,7 @@ const progressPercentage = levelXPRange > 0 ? (progressInCurrentLevel / levelXPR
             </div>
           </>
         ) : currentGame && (
-          /* ====================================
-             SUBSECTION: INDIVIDUAL GAME INTERFACE
-             To update game UI: Find this subsection
-             ==================================== */
+          /* Individual Game Interface */
           <div className="bg-white rounded-3xl border-2 border-gray-200 overflow-hidden shadow-lg mx-6">
             {/* Game Header */}
             <div className={`bg-gradient-to-r ${currentGame.color} p-6`}>
@@ -693,29 +564,23 @@ const progressPercentage = levelXPRange > 0 ? (progressInCurrentLevel / levelXPR
               {/* Result */}
               {showResult && selectedAnswer !== null && (
                 <div className="space-y-4">
-                  <div
-                    className={`rounded-xl p-4 border-2 ${
+                  <div className={`rounded-xl p-4 border-2 ${
+                    currentGame.options[selectedAnswer].isCorrect
+                      ? 'border-green-500 bg-green-50'
+                      : 'border-red-500 bg-red-50'
+                  }`}>
+                    <h5 className={`font-bold text-sm mb-2 ${
                       currentGame.options[selectedAnswer].isCorrect
-                        ? 'border-green-500 bg-green-50'
-                        : 'border-red-500 bg-red-50'
-                    }`}
-                  >
-                    <h5
-                      className={`font-bold text-sm mb-2 ${
-                        currentGame.options[selectedAnswer].isCorrect
-                          ? 'text-green-700'
-                          : 'text-red-700'
-                      }`}
-                    >
+                        ? 'text-green-700'
+                        : 'text-red-700'
+                    }`}>
                       {currentGame.options[selectedAnswer].isCorrect ? '🎉 Correct!' : '❌ Not Quite!'}
                     </h5>
-                    <p
-                      className={`text-sm leading-relaxed ${
-                        currentGame.options[selectedAnswer].isCorrect
-                          ? 'text-green-600'
-                          : 'text-red-600'
-                      }`}
-                    >
+                    <p className={`text-sm leading-relaxed ${
+                      currentGame.options[selectedAnswer].isCorrect
+                        ? 'text-green-600'
+                        : 'text-red-600'
+                    }`}>
                       {currentGame.options[selectedAnswer].explanation}
                     </p>
                   </div>
@@ -731,32 +596,24 @@ const progressPercentage = levelXPRange > 0 ? (progressInCurrentLevel / levelXPR
 
                   {/* Points Earned */}
                   <div className="text-center">
-                    <div
-                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm border-2 ${
+                    <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm border-2 ${
+                      currentGame.options[selectedAnswer].isCorrect
+                        ? 'bg-green-50 border-green-200'
+                        : 'bg-orange-50 border-orange-200'
+                    }`}>
+                      <Trophy className={`${
                         currentGame.options[selectedAnswer].isCorrect
-                          ? 'bg-green-50 border-green-200'
-                          : 'bg-orange-50 border-orange-200'
-                      }`}
-                    >
-                      <Trophy
-                        className={`${
-                          currentGame.options[selectedAnswer].isCorrect
-                            ? 'text-green-500'
-                            : 'text-orange-500'
-                        }`}
-                        size={16}
-                      />
-                      <span
-                        className={`font-bold ${
-                          currentGame.options[selectedAnswer].isCorrect
-                            ? 'text-green-700'
-                            : 'text-orange-700'
-                        }`}
-                      >
-                        +{currentGame.options[selectedAnswer].isCorrect
-                          ? currentGame.points.correct
-                          : currentGame.points.wrong}{' '}
-                        XP Earned!
+                          ? 'text-green-500'
+                          : 'text-orange-500'
+                      }`} size={16} />
+                      <span className={`font-bold ${
+                        currentGame.options[selectedAnswer].isCorrect
+                          ? 'text-green-700'
+                          : 'text-orange-700'
+                      }`}>
+                        +{currentGame.options[selectedAnswer].isCorrect 
+                          ? currentGame.points.correct 
+                          : currentGame.points.wrong} XP Earned!
                       </span>
                     </div>
                   </div>
@@ -783,10 +640,7 @@ const progressPercentage = levelXPRange > 0 ? (progressInCurrentLevel / levelXPR
         )}
       </div>
 
-      {/* ====================================
-          SUBSECTION: SUCCESS MODAL
-          To update completion messages: Find this subsection
-          ==================================== */}
+      {/* Success Modal */}
       <SuccessModal
         isOpen={showSuccessModal}
         onClose={() => setShowSuccessModal(false)}
