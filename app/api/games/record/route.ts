@@ -1,5 +1,5 @@
 // app/api/games/record/route.ts
-// Simplified approach - avoid complex date queries
+// Emergency fix - completely avoid dailyGame table for now
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/database/client'
@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { userId, gameId, score, xpEarned } = body
 
-    console.log('🎯 Recording game:', { userId, gameId, score, xpEarned })
+    console.log('🎯 Recording game (emergency mode):', { userId, gameId, score, xpEarned })
 
     // Validate required fields
     if (!userId || !gameId || score === undefined || xpEarned === undefined) {
@@ -22,57 +22,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get today's date as a simple string
-    const today = new Date()
-    const todayDateOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-
-    console.log('📅 Today date:', todayDateOnly.toISOString())
-
-    // Check if user has already played this game today using simpler approach
-    const allUserGames = await prisma.dailyGame.findMany({
-      where: {
-        userId: userId,
-        gameId: gameId
-      },
-      select: {
-        playedDate: true
-      }
-    })
-
-    // Check in JavaScript instead of SQL
-    const todayString = todayDateOnly.toISOString().split('T')[0]
-    const hasPlayedToday = allUserGames.some(game => {
-      const gameDate = new Date(game.playedDate).toISOString().split('T')[0]
-      return gameDate === todayString
-    })
-
-    if (hasPlayedToday) {
-      console.log('⚠️ Game already played today')
-      return NextResponse.json(
-        { 
-          error: 'Game already played today',
-          message: 'You can only play each game once per day'
-        },
-        { status: 409 }
-      )
-    }
-
-    console.log('✅ Game not played today, creating record...')
-
-    // Use transaction for data consistency
+    // SKIP daily game checking for now - just record session and update XP
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Record the daily game with simple date
-      const dailyGame = await tx.dailyGame.create({
-        data: {
-          userId,
-          gameId,
-          playedDate: todayDateOnly, // Use simple date
-          xpEarned,
-          score
-        }
-      })
-
-      // 2. Record detailed game session
+      // 1. Record detailed game session only (skip dailyGame table)
       const gameSession = await tx.gameSession.create({
         data: {
           userId,
@@ -84,7 +36,7 @@ export async function POST(request: NextRequest) {
         }
       })
 
-      // 3. Update user's total XP
+      // 2. Update user's total XP
       const updatedUser = await tx.user.update({
         where: { id: userId },
         data: {
@@ -95,7 +47,7 @@ export async function POST(request: NextRequest) {
         }
       })
 
-      // 4. Calculate new level
+      // 3. Calculate new level
       const newLevel = calculateLevel(updatedUser.totalXP)
       let levelChanged = false
 
@@ -111,7 +63,6 @@ export async function POST(request: NextRequest) {
       }
 
       return {
-        dailyGame,
         gameSession,
         newTotalXP: updatedUser.totalXP,
         newLevel,
@@ -119,13 +70,13 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    console.log('✅ Game recorded successfully:', result.newTotalXP, 'XP')
+    console.log('✅ Game recorded successfully (emergency mode):', result.newTotalXP, 'XP')
 
     return NextResponse.json({
       success: true,
       message: 'Game recorded successfully',
       data: {
-        xpEarned: result.dailyGame.xpEarned,
+        xpEarned: xpEarned,
         totalXP: result.newTotalXP,
         level: result.newLevel,
         levelUp: result.levelUp
@@ -133,7 +84,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('❌ Error recording game:', error)
+    console.error('❌ Error recording game (emergency mode):', error)
     
     return NextResponse.json(
       { 
@@ -159,14 +110,14 @@ function calculateLevel(totalXP: number): string {
 export async function GET() {
   try {
     const userCount = await prisma.user.count()
-    const gameCount = await prisma.dailyGame.count()
+    const sessionCount = await prisma.gameSession.count()
 
     return NextResponse.json({
       status: 'ok',
       database: 'connected',
       stats: {
         users: userCount,
-        gamesPlayed: gameCount
+        gameSessions: sessionCount
       },
       timestamp: new Date().toISOString()
     })
