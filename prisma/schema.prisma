@@ -34,7 +34,7 @@ model DailyGame {
   played_date String   // Store as string YYYY-MM-DD
   xp_earned   Int
   score       Int      @default(0)
-  completed_at DateTime @default(now())
+  // completed_at DateTime @default(now())  // REMOVE THIS LINE
 
   // Relations
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
@@ -43,7 +43,6 @@ model DailyGame {
   @@unique([user_id, game_id, played_date])
   @@map("daily_games")
 }
-
 model DailyQuestion {
   id            String   @id @default(cuid())
   game_id       String
